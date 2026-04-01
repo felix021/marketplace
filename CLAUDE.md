@@ -2,7 +2,7 @@
 
 This repo is a personal Claude Code skills marketplace for `felix021`.
 
-Install via: `claude plugin marketplace add felix021/marketplace`
+Install via: `claude plugin install felix021@felix021-skills`
 
 ## Structure
 
