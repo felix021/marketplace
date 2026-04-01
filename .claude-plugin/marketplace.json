@@ -1,0 +1,28 @@
+{
+  "name": "marketplace",
+  "owner": {
+    "name": "felix021",
+    "url": "https://github.com/felix021"
+  },
+  "metadata": {
+    "description": "Personal Claude Code skills by felix021",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "felix021",
+      "description": "Personal skills collection by felix021",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/dnspod",
+        "./skills/feishu-notify",
+        "./skills/modelscope-download",
+        "./skills/python-env-setup",
+        "./skills/superprompt",
+        "./skills/install-recommended-skills",
+        "./skills/skill-vetter"
+      ]
+    }
+  ]
+}
