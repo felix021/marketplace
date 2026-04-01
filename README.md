@@ -5,6 +5,7 @@ Personal Claude Code skills by [felix021](https://github.com/felix021).
 ## Install
 
 ```bash
+claude plugin marketplace add felix021/marketplace
 claude plugin install felix021@felix021-skills
 ```
 
