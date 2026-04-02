@@ -22,7 +22,7 @@
         "./skills/superprompt",
         "./skills/install-recommended-skills",
         "./skills/skill-vetter",
-        "./skills/code-review-with-issue"
+        "./skills/gh-code-review"
       ]
     }
   ]
