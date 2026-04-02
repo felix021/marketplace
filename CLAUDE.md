@@ -45,3 +45,7 @@ skills/
 | `license` | no | License type |
 | `argument-hint` | no | Hint shown to user, e.g. `<query>` |
 | `allowed-tools` | no | Restrict which tools the skill can use |
+
+## Principles
+
+- **Examples must use placeholder data**: All examples in SKILL.md files must use fictional/placeholder domains, IPs, and identifiers (e.g. `test.com`, `x.y.test.com`, `1.2.3.4`, `example.com`). Never use real user data, production domains, or actual IP addresses in examples.

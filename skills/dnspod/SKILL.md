@@ -29,7 +29,12 @@ tools:
 1. **检查环境变量**：确认 `DNSPOD_ID` 和 `DNSPOD_KEY` 已设置，否则提示用户配置
 2. **解析用户意图**：根据用户需求确定操作类型
 3. **构造参数**：提取域名、子域名、记录类型、记录值等参数
-4. **执行命令**：调用 Python 脚本 `~/.claude/skills/dnspod/scripts/dnspod.py`
+
+   **域名拆分规则**：用户给出的 FQDN（如 `sg.x.felix021.cn`）需要拆分为 `<domain>` 和 `<sub_domain>`。通过 `list-domains` 获取用户拥有的域名列表，然后匹配最长的后缀来确定 domain，剩余部分为 sub_domain。
+   - 例：用户域名包含 `test.com` → `x.y.test.com` 拆为 domain=`test.com`, sub_domain=`x.y`
+   - 例：`www.test.com` 拆为 domain=`test.com`, sub_domain=`www`
+   - 例：`test.com` 拆为 domain=`test.com`, sub_domain=`@`
+4. **执行命令**：调用 Python 脚本 `scripts/dnspod.py`（相对于本 skill 所在目录）
 5. **展示结果**：格式化输出返回信息，如有错误则说明原因
 
 ## 支持的操作
@@ -37,44 +42,44 @@ tools:
 ### 列出域名
 
 ```bash
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py list-domains
+python3 <skill_dir>/scripts/dnspod.py list-domains
 ```
 
 ### 查询解析记录
 
 ```bash
 # 查看域名下所有记录
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py list-records <domain>
+python3 <skill_dir>/scripts/dnspod.py list-records <domain>
 
 # 筛选子域名
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py list-records <domain> <sub_domain>
+python3 <skill_dir>/scripts/dnspod.py list-records <domain> <sub_domain>
 
 # 筛选记录类型（A/CNAME/MX/TXT/NS/AAAA/SRV 等）
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py list-records <domain> <sub_domain> A
+python3 <skill_dir>/scripts/dnspod.py list-records <domain> <sub_domain> A
 ```
 
 ### 创建解析记录
 
 ```bash
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py create-record <domain> <sub_domain> <type> <value> [line] [ttl]
+python3 <skill_dir>/scripts/dnspod.py create-record <domain> <sub_domain> <type> <value> [line] [ttl]
 
 # 示例：添加 A 记录
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py create-record example.com www A 1.2.3.4
+python3 <skill_dir>/scripts/dnspod.py create-record example.com www A 1.2.3.4
 
 # 示例：添加 CNAME 记录
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py create-record example.com blog CNAME cdn.example.com
+python3 <skill_dir>/scripts/dnspod.py create-record example.com blog CNAME cdn.example.com
 
 # 示例：指定解析线路和 TTL
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py create-record example.com api A 5.6.7.8 默认 300
+python3 <skill_dir>/scripts/dnspod.py create-record example.com api A 5.6.7.8 默认 300
 ```
 
 ### 修改解析记录
 
 ```bash
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py modify-record <domain> <record_id> <sub_domain> <type> <value> [line] [ttl]
+python3 <skill_dir>/scripts/dnspod.py modify-record <domain> <record_id> <sub_domain> <type> <value> [line] [ttl]
 
 # 示例：更新 A 记录 IP
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py modify-record example.com 12345 www A 9.8.7.6
+python3 <skill_dir>/scripts/dnspod.py modify-record example.com 12345 www A 9.8.7.6
 ```
 
 > 注意：修改记录需要先通过 `list-records` 获取 `record_id`。
@@ -82,7 +87,7 @@ python3 ~/.claude/skills/dnspod/scripts/dnspod.py modify-record example.com 1234
 ### 删除解析记录
 
 ```bash
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py delete-record <domain> <record_id>
+python3 <skill_dir>/scripts/dnspod.py delete-record <domain> <record_id>
 ```
 
 > **警告**：删除操作不可恢复，执行前必须向用户确认。
@@ -90,14 +95,14 @@ python3 ~/.claude/skills/dnspod/scripts/dnspod.py delete-record <domain> <record
 ### 启用/禁用解析记录
 
 ```bash
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py toggle-record <domain> <record_id> enable
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py toggle-record <domain> <record_id> disable
+python3 <skill_dir>/scripts/dnspod.py toggle-record <domain> <record_id> enable
+python3 <skill_dir>/scripts/dnspod.py toggle-record <domain> <record_id> disable
 ```
 
 ### 查看帮助
 
 ```bash
-python3 ~/.claude/skills/dnspod/scripts/dnspod.py help
+python3 <skill_dir>/scripts/dnspod.py help
 ```
 
 > 也可通过 `/dnspod help` 调用，展示所有支持的命令、参数和示例。
