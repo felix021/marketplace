@@ -14,7 +14,7 @@ Third-party skills are installed via the Claude CLI plugin marketplace — no gi
 | Marketplace | Source | Plugins |
 |---|---|---|
 | `claude-plugins-official` | anthropics/claude-plugins-official | `frontend-design`, `superpowers`, `skill-creator` |
-| `anthropic-agent-skills` | anthropics/skills | `document-skills`, `example-skills`, `claude-api` |
+| `anthropic-agent-skills` | anthropics/skills | `document-skills` |
 | `pua-skills` | tanweai/pua | `pua` |
 | `web-access` | eze-is/web-access | `web-access` |
 

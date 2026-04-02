@@ -18,8 +18,6 @@ $Plugins = @(
   "superpowers@claude-plugins-official"
   "skill-creator@claude-plugins-official"
   "document-skills@anthropic-agent-skills"
-  "example-skills@anthropic-agent-skills"
-  "claude-api@anthropic-agent-skills"
   "pua@pua-skills"
   "web-access@web-access"
 )
@@ -55,11 +53,16 @@ function Cmd-Init {
   Write-Host ""
   Write-Host "Installing npm packages..."
   foreach ($pkg in $NpmPackages) {
-    Write-Host "  Installing: $pkg"
-    try {
-      npm install -g $pkg 2>&1 | Out-Null
-    } catch {
-      Write-Host "  WARNING: Failed to install $pkg"
+    $already = Get-Command $pkg -ErrorAction SilentlyContinue
+    if ($already) {
+      Write-Host "  Skipping: $pkg (already installed)"
+    } else {
+      Write-Host "  Installing: $pkg"
+      try {
+        npm install -g $pkg 2>&1 | Out-Null
+      } catch {
+        Write-Host "  WARNING: Failed to install $pkg"
+      }
     }
   }
 

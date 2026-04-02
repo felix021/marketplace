@@ -20,8 +20,6 @@ PLUGINS=(
   superpowers@claude-plugins-official
   skill-creator@claude-plugins-official
   document-skills@anthropic-agent-skills
-  example-skills@anthropic-agent-skills
-  claude-api@anthropic-agent-skills
   pua@pua-skills
   web-access@web-access
 )
@@ -50,8 +48,12 @@ cmd_init() {
   echo ""
   echo "Installing npm packages..."
   for pkg in "${NPM_PACKAGES[@]}"; do
-    echo "  Installing: $pkg"
-    npm install -g "$pkg" 2>&1 || echo "  WARNING: Failed to install $pkg"
+    if command -v "$pkg" &>/dev/null || npm list -g "$pkg" &>/dev/null; then
+      echo "  Skipping: $pkg (already installed)"
+    else
+      echo "  Installing: $pkg"
+      npm install -g "$pkg" 2>&1 || echo "  WARNING: Failed to install $pkg"
+    fi
   done
 
   echo ""
