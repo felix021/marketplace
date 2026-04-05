@@ -15,9 +15,11 @@ argument-hint: "[triage|solve|review|respond|status] [issue/PR number or range]"
 
 # github-workflow — AI-Driven GitHub Automation
 
-End-to-end workflow that turns GitHub issues into tested PRs, reviews incoming PRs, and
-keeps humans in the loop via notifications. Designed for recurring automation (works with
-`/loop`) or one-shot execution.
+End-to-end workflow that turns GitHub issues into merged, deployed code. When `claude-glm`
+is available, operates in full autonomy mode — dual-agent consensus replaces human gating
+for most decisions (including merge, close, build, deploy). Humans are notified but not
+blocked. Without `claude-glm`, falls back to human-in-the-loop mode. Designed for recurring
+automation (works with `/loop`) or one-shot execution.
 
 ```
   ┌─────────┐     ┌─────────────────────────────────────────────┐
@@ -38,18 +40,25 @@ keeps humans in the loop via notifications. Designed for recurring automation (w
 
 ## Safety Principles
 
-These constraints exist because automated actions on shared repos are hard to reverse and
-visible to collaborators. The skill is designed to be a productive assistant, not an
-autonomous operator.
+These constraints balance autonomous delivery with responsible operation.
 
-1. **Never auto-close issues** — use labels to track state, human closes after confirming
-2. **Never auto-merge PRs** unless dual-agent consensus (claude-glm approves) — otherwise
-   mark as ready and notify the human
-3. **Never force-push** — always create new commits for fixes
-4. **Always notify** — every meaningful state change gets a notification
-5. **Human gates** — architecture decisions, breaking changes, CI/CD config, and ambiguous
-   requirements always pause and ask (even with dual-agent consensus)
-6. **Dual-agent merge = issue stays open** — `ai:human-confirm` tag ensures human reviews
+1. **Never force-push** — always create new commits for fixes
+2. **Always log decisions** — every decision and its reasoning goes to the Decision Log
+3. **Always notify** — every meaningful state change gets a notification via available
+   channels (feishu/lark, telegram, or gh comment as fallback)
+4. **Dual-agent autonomy** — when `claude-glm` is available and both agents reach consensus,
+   proceed without human approval for: merging PRs, closing issues, building, and deploying.
+   Human is notified but does not gate.
+5. **Hard human gates (even with dual-agent consensus):**
+   - PRs touching CI/CD configs, secrets, or permissions
+   - Changes to authentication/authorization systems
+   - Database migrations that drop data
+   - License or legal-sensitive changes
+   These always pause and ask the human regardless of consensus.
+6. **Single-agent mode (no claude-glm)** — behaves as before: mark as ready and wait for
+   human to confirm/merge/deploy
+7. **Disagreement escalation** — if the two agents cannot reach consensus after 2 rounds of
+   discussion, escalate to human with both perspectives
 
 ## Prerequisites
 
@@ -65,28 +74,35 @@ claude-glm --version   # GLM-powered Claude instance for cross-model review
 # feishu-notify skill OR telegram-notify skill OR any notification channel
 ```
 
-## AI Pair Review (claude-glm)
+## AI Pair Review (claude-glm) — Dual-Agent Autonomy
 
 If `claude-glm` is available locally (a Claude-compatible CLI powered by 智谱GLM), the
-workflow gains a **dual-agent consensus** mode. Two independent AI models review each other's
-work, catching blind spots and enabling higher autonomy.
+workflow operates in **full autonomy mode**. Two independent AI models discuss and review
+each other's work. When they agree, the workflow proceeds end-to-end without human
+intervention — including merge, close, build, and deploy.
 
 **Read `references/ai-pair-review.md` for full protocols** (discussion prompts, review
-prompts, JSON schemas). Summary below:
+prompts, JSON schemas, decision logging). Summary below:
 
 ```bash
 # Detection
 command -v claude-glm &>/dev/null && GLM_AVAILABLE=true
 ```
 
-| Phase | Without claude-glm | With claude-glm |
-|-------|-------------------|-----------------|
-| **Ambiguous requirements** | Wait for human | Discuss with GLM first; consensus → proceed; disagree → escalate |
-| **Code review** | Label `ai:review`, wait | GLM reviews diff; LGTM → can merge PR |
-| **PR merge** | Never auto-merge | Can merge if GLM approves — tag issue `ai:human-confirm` |
+| Phase | Without claude-glm | With claude-glm (consensus) |
+|-------|-------------------|----------------------------|
+| **Any question/decision** | Ask human | Discuss with GLM first; consensus → proceed; disagree → escalate |
+| **Ambiguous requirements** | Wait for human | Discuss → consensus → proceed |
+| **Code review** | Label `ai:review`, wait for human | GLM reviews diff; LGTM → merge PR |
+| **PR merge** | Never auto-merge | Auto-merge on consensus |
+| **Issue close** | Never auto-close | Auto-close after merge on consensus |
+| **Build & deploy** | Notify human | Auto-build and deploy on consensus |
 
-**Key rule:** Even with consensus, issue stays open with `ai:human-confirm` label. Human
-removes the tag after confirming. Never auto-close, never merge PRs touching CI/secrets.
+**Key rules:**
+- All autonomous decisions are logged in the Decision Log (see below)
+- Human is notified of all actions via available channels but does NOT gate them
+- Hard human gates still apply (see Safety Principles)
+- If agents disagree after 2 rounds, escalate to human
 
 ## Repo Detection
 
@@ -101,7 +117,7 @@ If this fails, ask the user for the repo. All `gh` commands below use `--repo $R
 All labels use the `ai:` prefix. Create them idempotently:
 
 ```bash
-for label in ai:ready ai:needs-clarification ai:human-confirm \
+for label in ai:ready ai:needs-clarification ai:human-confirm ai:autonomous \
              ai:plan ai:impl ai:review ai:fix ai:confirm; do
   gh label create "$label" --repo $REPO 2>/dev/null || true
 done
@@ -111,12 +127,53 @@ done
 |-------|---------|
 | `ai:ready` | Triaged and ready for AI to pick up |
 | `ai:needs-clarification` | AI needs more info before proceeding |
-| `ai:human-confirm` | AI agents agreed and acted — human please confirm |
+| `ai:human-confirm` | Single-agent mode: human must confirm before merge |
+| `ai:autonomous` | Resolved end-to-end by dual-agent consensus (Claude + GLM) |
 | `ai:plan` | Solve state: needs planning |
 | `ai:impl` | Solve state: plan approved, ready to build |
 | `ai:review` | Solve state: implementation done, needs review |
 | `ai:fix` | Solve state: review found issues, needs fixes |
-| `ai:confirm` | Solve state: review passed, user should confirm |
+| `ai:confirm` | Solve state: review passed, user should confirm (single-agent only) |
+
+---
+
+## Decision Log
+
+Every autonomous decision made by the dual-agent pair must be logged. This gives the human
+a clear audit trail without requiring them to be in the loop.
+
+### Where to log
+
+1. **Issue comment** — post a structured decision note on the relevant issue
+2. **Notification** — send a summary via available channels (feishu/lark, telegram)
+
+### Decision note format
+
+```markdown
+## 🤖 Autonomous Decision
+
+**Action:** {what was done — e.g., "Merged PR #42 to main", "Closed issue #38"}
+**Consensus:** Claude ✅ + GLM ✅
+**Reasoning:** {1-2 sentences on why both agents agreed}
+**Reversible:** {yes/no — and how to reverse if yes}
+**Notification sent:** {channel — e.g., "feishu", "telegram", "gh comment only"}
+
+<details>
+<summary>Discussion transcript</summary>
+
+{Claude's position}
+{GLM's response}
+{Final agreement}
+</details>
+```
+
+### When to notify human (even with consensus)
+
+Use available notification channels (`felix021:feishu-notify` skill, telegram, etc.) for:
+
+- **Always notify:** PR merged, issue closed, deploy triggered, build failure
+- **Notify if notable:** architecture decisions, dependency changes, new APIs
+- **Skip notification:** routine label changes, status checks, intermediate commits
 
 ---
 
@@ -262,10 +319,15 @@ issue is already well-specified, skip brainstorming and go straight to
    gh issue edit $NUMBER --repo $REPO --remove-label ai:plan --add-label ai:impl
    ```
 
-**If the issue is ambiguous and claude-glm is available:**
-Run the Requirements Discussion Protocol (see `references/ai-pair-review.md`). If both
-agents reach consensus, proceed. If they disagree, post both interpretations, label
-`ai:needs-clarification`, notify the human, and stop.
+**If claude-glm is available:**
+Run the Discussion Protocol (see `references/ai-pair-review.md`) for any non-trivial
+decision: requirements interpretation, design choices, scope questions. If both agents
+reach consensus, proceed without human input and log the decision. If they disagree after
+2 rounds, post both interpretations, label `ai:needs-clarification`, notify the human, and
+stop.
+
+**If claude-glm is NOT available:**
+Ambiguous issues require human input — label `ai:needs-clarification` and wait.
 
 **Exit criteria:** Spec + plan committed, issue labeled `ai:impl`.
 
@@ -367,24 +429,33 @@ peer review by claude-glm after push (independent model, catches blind spots).
 #### Verdict
 
 7. **If APPROVE (self-review passed, and peer review passed or was skipped):**
+
+   **With dual-agent consensus (claude-glm approved):** Full autonomous delivery —
+   ```bash
+   # Create and merge PR
+   gh pr create --repo $REPO --title "{type}: {description} (#$NUMBER)" --body "..."
+   gh pr merge $PR_NUMBER --repo $REPO --squash --body "AI pair review passed (Claude + GLM)"
+   # Close the issue
+   gh issue close $NUMBER --repo $REPO --comment "Resolved via dual-agent consensus. PR #$PR_NUMBER merged."
+   # Log decision and notify human
+   ```
+   Post a Decision Log entry on the issue. Notify human via available channels.
+   Then proceed to **Build & Deploy** (see below) if applicable.
+   Skip Phase 5 entirely — no human confirmation needed.
+
+   **Without claude-glm (single-agent):**
    ```bash
    gh issue edit $NUMBER --repo $REPO --remove-label ai:review --add-label ai:confirm
    ```
-   If claude-glm peer-reviewed and approved (dual-agent consensus), optionally create and
-   merge PR:
-   ```bash
-   gh pr create --repo $REPO --title "{type}: {description} (#$NUMBER)" --body "..."
-   gh pr merge $PR_NUMBER --repo $REPO --squash --body "AI pair review passed (Claude + GLM)"
-   gh issue edit $NUMBER --repo $REPO --add-label "ai:human-confirm"
-   ```
-   **Do NOT close the issue** — human removes `ai:human-confirm` after confirming.
+   Proceed to Phase 5 for human confirmation.
 
 8. **If REQUEST_CHANGES (peer review found issues):**
    ```bash
    gh issue edit $NUMBER --repo $REPO --remove-label ai:review --add-label ai:fix
    ```
 
-**Exit criteria:** Review posted, label updated based on verdict.
+**Exit criteria:** Review posted, label updated based on verdict. With dual-agent consensus:
+PR merged, issue closed, build/deploy triggered.
 
 #### Review Prompt Template
 
@@ -440,11 +511,50 @@ Verify each fix, then check for new issues introduced by the fixes.
 
 ---
 
-### Phase 5: Confirm (ai:confirm)
+### Build & Deploy (dual-agent consensus only)
 
-**Entry:** Issue has `ai:confirm` label (review passed).
+**Entry:** PR merged via dual-agent consensus in Phase 3.
 
-1. Push and create PR (if not already done in Phase 3 via dual-agent merge):
+When both agents agree the change is ready, trigger build and deploy automatically:
+
+1. **Build verification** (on main after merge):
+   ```bash
+   git checkout main && git pull
+   # Auto-detect and run build
+   # Go: go build ./...
+   # Node: npm run build
+   # Python: python -m pytest
+   # Rust: cargo build
+   ```
+
+2. **Deploy** (if the repo has a deploy mechanism):
+   - Detect deploy method: `Makefile` targets, `deploy.sh`, GitHub Actions, etc.
+   - Run the deploy command
+   - Verify deployment succeeded (health check, smoke test)
+
+3. **If build or deploy fails:**
+   - Post failure details to the issue (reopen if closed)
+   - Notify human immediately via feishu/telegram — this is a **hard escalation**
+   - Do NOT retry deploy more than once
+
+4. **Log & notify:**
+   - Post Decision Log entry with build/deploy results
+   - Notify human: "Issue #N resolved, PR merged, deployed successfully"
+
+5. **Clean up:**
+   - Remove worktree: `git worktree remove <worktree-path>`
+   - Delete workflow state: `rm .claude/workflow/issue-$NUMBER.json`
+
+---
+
+### Phase 5: Confirm (ai:confirm) — Single-Agent Mode Only
+
+**Entry:** Issue has `ai:confirm` label (review passed, but no claude-glm for consensus).
+
+> **Note:** This phase is skipped entirely when dual-agent consensus is achieved in Phase 3.
+> With claude-glm, the workflow goes directly from Phase 3 → Build & Deploy → done.
+
+1. Push and create PR (if not already done):
    ```bash
    git push -u origin "$BRANCH"
    gh pr create --repo $REPO \
@@ -484,7 +594,7 @@ Verify each fix, then check for new issues introduced by the fixes.
    - Merge branch to main: `cd <project-root> && git merge <branch>`
    - Merge via PR on GitHub
 
-4. After merge, clean up:
+4. After human approves and merge completes, clean up:
    - Remove worktree: `git worktree remove <worktree-path>`
    - Delete workflow state: `rm .claude/workflow/issue-$NUMBER.json`
    - Close issue: `gh issue close $NUMBER --repo $REPO`
@@ -657,10 +767,14 @@ Every phase transition should be documented with an issue comment:
 
 ## Notification
 
-Detection order: feishu-notify skill → lark-im skill → Telegram (env vars) → gh comment.
+Detection order: `felix021:feishu-notify` skill → Telegram (env vars) → `gh` comment.
 
-Notify on: triage complete, PR created, review posted, feedback addressed, blocked, errors.
-Do NOT notify on: issue picked up (too noisy), routine status checks.
+**Always notify on:** triage complete, PR merged, issue closed, deploy triggered,
+deploy succeeded/failed, blocked/escalated, errors, any autonomous decision.
+**Skip notification on:** issue picked up (too noisy), routine label changes, status checks.
+
+In dual-agent autonomy mode, notifications serve as the human's **awareness channel** —
+not a gate. The human can review decisions asynchronously and intervene if needed.
 
 ---
 
@@ -690,8 +804,8 @@ In recurring mode:
 - **Rate limiting**: If `gh` returns 403/429, back off and notify human
 - **Repo has no issues**: Report clean state, skip
 - **Issue references other issues**: Note dependencies in PR body, don't auto-resolve deps
-- **Large/architecture issues**: Label as `ai:needs-clarification`, post a proposed approach
-  as a comment, and wait for human approval before implementing
+- **Large/architecture issues**: If claude-glm available, discuss approach with it — consensus
+  → proceed; otherwise label `ai:needs-clarification` and wait for human
 
 ---
 
