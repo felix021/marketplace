@@ -103,6 +103,11 @@ command -v claude-glm &>/dev/null && GLM_AVAILABLE=true
 - Human is notified of all actions via available channels but does NOT gate them
 - Hard human gates still apply (see Safety Principles)
 - If agents disagree after 2 rounds, escalate to human
+- **Never ask human trivial questions** — if claude-glm is available, discuss with it and
+  proceed on consensus. This includes: "should I pick up issue X?", "should I start the
+  next cycle?", "is this ready?", prioritization calls, sequencing decisions, and any
+  yes/no operational question. The whole point of dual-agent mode is to keep the human
+  out of the loop. Only escalate when consensus fails or hard gates apply.
 
 ## Repo Detection
 
@@ -749,8 +754,15 @@ gh issue list --repo $REPO --label "ai:needs-clarification" --state open --json 
 gh pr list --repo $REPO --state open --json number,title,headRefName,reviews
 ```
 
-Output a grouped table: Plan → Implement → Review → Fix → Confirm → Needs Clarification,
-with issue numbers, titles, linked PRs, and review status.
+Output a grouped table: Plan → Implement → Review → Fix → Confirm → Needs Clarification
+→ Autonomous, with issue numbers, titles, linked PRs, and review status.
+
+**With claude-glm:** After displaying the dashboard, discuss next actions with GLM (e.g.,
+which issue to pick up, what priority order). On consensus, proceed immediately — do NOT
+ask the human "Would you like me to...?" or "Should I pick up...?". Just do it and notify.
+
+**Without claude-glm:** Present the dashboard and suggest next actions for the human to
+approve.
 
 ---
 
@@ -790,6 +802,8 @@ When invoked via `/loop`, the skill runs a smart cycle:
 In recurring mode:
 - `triage` only processes issues created/updated since last run
 - `solve` picks one issue per cycle (to avoid overwhelming reviewers)
+- With claude-glm: fully autonomous — triage, prioritize, pick, solve, merge, deploy
+  without any human interaction. Notify on completion.
 - Skips if no actionable work found (no noisy "nothing to do" notifications)
 - Deduplicates: won't re-triage already-labeled issues or re-solve in-progress ones
 

@@ -28,8 +28,8 @@ fi
 
 ## General Discussion Protocol
 
-**For ANY question or decision** during the workflow, if claude-glm is available, discuss
-with it before asking the human. This applies to:
+**For ANY question or decision** during the workflow — no matter how trivial — if claude-glm
+is available, discuss with it instead of asking the human. This applies to:
 
 - Requirements interpretation
 - Design/architecture choices
@@ -38,6 +38,13 @@ with it before asking the human. This applies to:
 - Whether a test is sufficient
 - Whether a change is safe to deploy
 - Any ambiguity or judgment call
+- **Operational decisions**: which issue to pick up next, priority ordering, whether to
+  start the next cycle, whether something is "ready"
+- **Yes/no questions**: anything you'd otherwise ask the human for a simple go/no-go
+
+**The goal is zero human interaction in the happy path.** Only escalate when consensus
+fails or hard gates apply. Never output "Would you like me to...?" or "Should I...?" —
+discuss with GLM, agree, and proceed.
 
 ```bash
 cat > /tmp/glm-discuss-$NUMBER.md <<'EOF'
