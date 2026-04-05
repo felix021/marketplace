@@ -21,8 +21,7 @@
         "./skills/python-env-setup",
         "./skills/superprompt",
         "./skills/install-recommended-skills",
-        "./skills/skill-vetter",
-        "./skills/gh-code-review"
+        "./skills/skill-vetter"
       ]
     }
   ]
