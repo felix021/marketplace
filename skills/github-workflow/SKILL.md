@@ -236,7 +236,27 @@ Need clarification: 2 issues
 Need human: 1 issue
 ```
 
-### Step 5: Notify
+### Step 5: Respond to Unanswered Questions
+
+**Before moving to solve, check every open issue for unanswered user comments.** This is
+zero-cost, high-value work that should never be skipped regardless of issue priority.
+
+```bash
+# Fetch all open issues with their comments
+gh issue list --repo $REPO --state open --limit 50 --json number,title,comments
+```
+
+For each issue, check if the last comment is from a non-bot user and has no response.
+If so:
+- **Question about existing functionality** → answer immediately with usage instructions
+- **Bug report with reproduction steps** → acknowledge and triage
+- **Feature request with details** → acknowledge and label appropriately
+
+**CRITICAL:** Responding to user questions is NOT gated by priority or complexity. A user
+asking "how do I do X?" should get an answer within one cycle, not be classified as "P3"
+and ignored. Answering questions does not require writing code.
+
+### Step 6: Notify
 
 Send a triage summary via the notification channel (see Notification section below).
 
@@ -255,24 +275,67 @@ When given an issue number, auto-detect the current phase before doing anything:
 LABELS=$(gh issue view $NUMBER --repo $REPO --json labels -q '.labels[].name' | tr '\n' ',')
 ```
 
-- Has `ai:plan` or no workflow label → Phase 1 (Plan)
-- Has `ai:impl` → Phase 2 (Implement)
-- Has `ai:review` → Phase 3 (Review)
-- Has `ai:fix` → Phase 4 (Fix)
+**Standard label matching (check in reverse order — highest phase wins):**
 - Has `ai:confirm` → Phase 5 (Confirm)
+- Has `ai:fix` → Phase 4 (Fix)
+- Has `ai:review` → Phase 3 (Review)
+- Has `ai:impl` → Phase 2 (Implement)
+- Has `ai:plan` → Phase 1 (Plan)
+- No `ai:` workflow label → use Comment-Based Inference (below)
+
+**Non-standard label recovery:** If the issue has `ai:` prefixed labels that don't match
+any standard phase label (e.g. `ai:review-ready`, `ai:wip`, `ai:blocked`), do NOT silently
+default to Phase 1. Instead:
+
+1. Read the issue comments to infer the actual state:
+   ```bash
+   gh issue view $NUMBER --repo $REPO --json comments -q '.comments[-5:][].body'
+   ```
+2. Check for linked PRs or branches:
+   ```bash
+   gh pr list --repo $REPO --head "ai/issue-$NUMBER" --json number,state
+   ```
+3. Correct the label to the nearest standard label and log the correction as a comment
+4. Resume from the inferred phase
+
+**Comment-Based Inference (fallback):** When labels are missing or ambiguous, read the last
+5 comments on the issue. Look for signals:
+- "Implementation complete", code diffs, PR links → Phase 3 (Review)
+- "Plan approved", spec posted → Phase 2 (Implement)
+- Review feedback posted → Phase 4 (Fix)
+- Nothing → Phase 1 (Plan)
+
+**CRITICAL:** Never assume Phase 1 when evidence in comments/PRs shows the issue is further
+along. Resetting an in-progress issue to Phase 1 wastes all prior work.
 
 Jump directly to the detected phase. Never restart from Phase 1 if the issue is already
 further along.
 
 ### Issue Selection
 
-If no issue number given, pick the highest-priority `ai:ready` issue:
+If no issue number given, scan ALL open issues — not just those with `ai:ready`:
 
 ```bash
-gh issue list --repo $REPO --state open --label "ai:ready" --limit 5 --json number,title,body,labels
+# First: issues with workflow labels (in-progress work takes priority)
+gh issue list --repo $REPO --state open --limit 50 --json number,title,body,labels,comments
 ```
 
-Read the full issue:
+**Selection priority (highest first):**
+1. Issues with `ai:fix` or `ai:review` label (in-progress, closest to done)
+2. Issues with `ai:impl` label (planned, ready to build)
+3. Issues with `ai:plan` or `ai:ready` label (new work)
+4. Issues with non-standard `ai:` labels (need label correction + phase detection)
+5. Issues with no `ai:` labels but that are clearly actionable
+
+**Anti-skip rule:** Every cycle MUST produce substantive progress on at least one issue.
+"No actionable work" is only valid when literally zero open issues exist. If all issues
+seem hard, pick the most tractable one and make partial progress. Do NOT:
+- Skip issues because they "need AVD testing" (testing is post-development, not a blocker)
+- Skip issues because they seem "complex" (break them down)
+- Skip issues because a previous cycle already triaged them (triaging is not progress)
+- Report "all issues handled" when open issues still have pending work
+
+Read the full issue (including comments) before deciding what to do:
 
 ```bash
 gh issue view $NUMBER --repo $REPO --json title,body,comments,labels
