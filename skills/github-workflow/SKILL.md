@@ -797,14 +797,44 @@ When invoked via `/loop`, the skill runs a smart cycle:
 ```
 /loop 30m github-workflow triage
 /loop 1h github-workflow solve
+/loop 5m work with /github-workflow   # combined: triage + react + progress
 ```
 
-In recurring mode:
+Each cycle runs a **priority cascade** — react to new events first, then progress
+backlog, only idle if genuinely nothing to do:
+
+### Step 1: React (new events since last cycle)
+
+- New issues → triage (label, categorize, comment)
+- New user comments on existing issues → respond or advance phase
+- New PRs / review feedback → handle via `review` or `respond`
+
+### Step 2: Progress (sweep the backlog)
+
+If Step 1 found nothing new, scan for **stalled issues that can be progressed**:
+
+| Issue State | Condition to Progress | Action |
+|-------------|----------------------|--------|
+| `ai:plan` | User confirmed requirements (last comment answered questions) | Plan → move to `ai:impl` |
+| `ai:plan` | Issue body is a well-specified spec (no questions needed) | Plan → move to `ai:impl` |
+| `ai:impl` | Plan exists, worktree not yet created | Implement |
+| `ai:fix` | Review feedback exists in comments | Apply fixes → move to `ai:review` |
+| `ai:review` | Code committed but not yet reviewed | Self-review + push |
+| `ai:plan` + `ai:needs-clarification` | Awaiting user response | **Skip** (don't nag) |
+
+Pick **ONE** issue per cycle, highest priority first (P0 > P1 > P2 > P3).
+Between equal priorities, prefer bugs over features, smaller over larger.
+
+### Step 3: Idle
+
+Only if both React and Progress find nothing to do. No notification needed.
+
+### General rules
+
 - `triage` only processes issues created/updated since last run
 - `solve` picks one issue per cycle (to avoid overwhelming reviewers)
 - With claude-glm: fully autonomous — triage, prioritize, pick, solve, merge, deploy
   without any human interaction. Notify on completion.
-- Skips if no actionable work found (no noisy "nothing to do" notifications)
 - Deduplicates: won't re-triage already-labeled issues or re-solve in-progress ones
 
 ---
