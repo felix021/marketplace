@@ -24,11 +24,44 @@ PLUGINS=(
   web-access@web-access
 )
 
+# CLI tools (installed separately from plugins)
+CLI_TOOLS=(
+  rtk
+)
+
 # npm global packages
 NPM_PACKAGES=(
   bun
   claude-multi
 )
+
+# Install a single CLI tool
+install_cli_tool() {
+  local tool="$1"
+  case "$tool" in
+    rtk)
+      # Verify not already installed (and not the wrong rtk)
+      if command -v rtk &>/dev/null && rtk gain &>/dev/null 2>&1; then
+        echo "  Skipping: rtk (already installed, $(rtk --version 2>/dev/null || echo 'version unknown'))"
+        return 0
+      fi
+      echo "  Installing: rtk (Rust Token Killer)"
+      curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh 2>&1 || {
+        echo "  WARNING: rtk install failed"; return 1
+      }
+      # Verify correct rtk was installed
+      if ! rtk gain &>/dev/null 2>&1; then
+        echo "  WARNING: rtk installed but 'rtk gain' failed — may be wrong package (Rust Type Kit)"
+        return 1
+      fi
+      # Set up global hook (auto-patch settings.json)
+      rtk init -g --auto-patch 2>&1 || echo "  WARNING: rtk init -g failed"
+      ;;
+    *)
+      echo "  Unknown CLI tool: $tool"
+      ;;
+  esac
+}
 
 cmd_init() {
   echo "Adding marketplaces..."
@@ -43,6 +76,12 @@ cmd_init() {
   for plugin in "${PLUGINS[@]}"; do
     echo "  Installing: $plugin"
     claude plugin install "$plugin" 2>&1 || echo "  WARNING: Failed to install $plugin"
+  done
+
+  echo ""
+  echo "Installing CLI tools..."
+  for tool in "${CLI_TOOLS[@]}"; do
+    install_cli_tool "$tool"
   done
 
   echo ""

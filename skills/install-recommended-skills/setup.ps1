@@ -22,10 +22,44 @@ $Plugins = @(
   "web-access@web-access"
 )
 
+$CliTools = @("rtk")
+
 $NpmPackages = @(
   "bun"
   "claude-multi"
 )
+
+function Install-CliTool {
+  param([string]$Tool)
+  switch ($Tool) {
+    "rtk" {
+      $rtkCmd = Get-Command rtk -ErrorAction SilentlyContinue
+      if ($rtkCmd) {
+        # Verify it's the correct rtk (Token Killer, not Type Kit)
+        try {
+          rtk gain 2>&1 | Out-Null
+          Write-Host "  Skipping: rtk (already installed)"
+          return
+        } catch {
+          Write-Host "  WARNING: rtk found but 'rtk gain' failed — may be wrong package"
+        }
+      }
+      Write-Host "  Installing: rtk (Rust Token Killer)"
+      try {
+        Invoke-RestMethod -Uri "https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh" | Out-Null
+        # On Windows, prefer cargo install
+        cargo install --git https://github.com/rtk-ai/rtk 2>&1 | Out-Null
+        if (-not (rtk gain 2>&1)) {
+          throw "rtk gain failed after install"
+        }
+        rtk init -g --auto-patch 2>&1 | Out-Null
+      } catch {
+        Write-Host "  WARNING: rtk install failed: $_"
+      }
+    }
+    default { Write-Host "  Unknown CLI tool: $Tool" }
+  }
+}
 
 function Cmd-Init {
   Write-Host "Adding marketplaces..."
@@ -48,6 +82,12 @@ function Cmd-Init {
     } catch {
       Write-Host "  WARNING: Failed to install $plugin"
     }
+  }
+
+  Write-Host ""
+  Write-Host "Installing CLI tools..."
+  foreach ($tool in $CliTools) {
+    Install-CliTool -Tool $tool
   }
 
   Write-Host ""

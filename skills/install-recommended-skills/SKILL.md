@@ -18,6 +18,12 @@ Third-party skills are installed via the Claude CLI plugin marketplace — no gi
 | `pua-skills` | tanweai/pua | `pua` |
 | `web-access` | eze-is/web-access | `web-access` |
 
+## CLI Tools
+
+| Tool | Source | Description |
+|---|---|---|
+| `rtk` | rtk-ai/rtk | Token-optimized CLI proxy — saves 60-90% tokens on git/pnpm/test commands. Installs hook into `~/.claude/` for transparent use. |
+
 ## npm Global Packages
 
 | Package | Description |

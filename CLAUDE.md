@@ -34,6 +34,7 @@ skills/
    ```
 
 3. Commit both files.
+4. Update `README.md` skills table if description changed or skill was added/removed.
 
 ## SKILL.md frontmatter fields
 
